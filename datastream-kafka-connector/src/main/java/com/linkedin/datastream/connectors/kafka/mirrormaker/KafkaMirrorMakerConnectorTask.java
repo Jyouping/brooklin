@@ -5,6 +5,7 @@
  */
 package com.linkedin.datastream.connectors.kafka.mirrormaker;
 
+import com.linkedin.datastream.server.api.transport.SendCallback;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -239,7 +240,7 @@ public class KafkaMirrorMakerConnectorTask extends AbstractKafkaBasedConnectorTa
 
   @Override
   protected void sendDatastreamProducerRecord(DatastreamProducerRecord datastreamProducerRecord,
-      TopicPartition srcTopicPartition, int numBytes) {
+      TopicPartition srcTopicPartition, int numBytes, SendCallback sendCallback) {
     if (_isFlushlessModeEnabled) {
       // The topic/partition from checkpoint is the same as srcTopicPartition
       KafkaMirrorMakerCheckpoint sourceCheckpoint =
@@ -254,6 +255,9 @@ public class KafkaMirrorMakerConnectorTask extends AbstractKafkaBasedConnectorTa
               rewindAndPausePartitionOnException(srcTopicPartition, exception);
             } else {
               _consumerMetrics.updateBytesProcessedRate(numBytes);
+            }
+            if (sendCallback != null) {
+              sendCallback.onCompletion(metadata, exception);
             }
           }));
       if (_flowControlEnabled) {
@@ -272,7 +276,7 @@ public class KafkaMirrorMakerConnectorTask extends AbstractKafkaBasedConnectorTa
         }
       }
     } else {
-      super.sendDatastreamProducerRecord(datastreamProducerRecord, srcTopicPartition, numBytes);
+      super.sendDatastreamProducerRecord(datastreamProducerRecord, srcTopicPartition, numBytes, sendCallback);
     }
   }
 

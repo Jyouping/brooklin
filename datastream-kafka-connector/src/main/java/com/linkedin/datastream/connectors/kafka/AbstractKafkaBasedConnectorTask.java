@@ -54,6 +54,7 @@ import com.linkedin.datastream.common.PollUtils;
 import com.linkedin.datastream.connectors.CommonConnectorMetrics;
 import com.linkedin.datastream.kafka.KafkaDatastreamMetadataConstants;
 import com.linkedin.datastream.metrics.BrooklinMetricInfo;
+import com.linkedin.datastream.server.api.transport.SendCallback;
 import com.linkedin.datastream.server.DatastreamEventProducer;
 import com.linkedin.datastream.server.DatastreamProducerRecord;
 import com.linkedin.datastream.server.DatastreamTask;
@@ -226,7 +227,7 @@ abstract public class AbstractKafkaBasedConnectorTask implements Runnable, Consu
           } else {
             DatastreamProducerRecord datastreamProducerRecord = translate(record, readTime);
             int numBytes = record.serializedKeySize() + record.serializedValueSize();
-            sendDatastreamProducerRecord(datastreamProducerRecord, topicPartition, numBytes);
+            sendDatastreamProducerRecord(datastreamProducerRecord, topicPartition, numBytes, null);
           }
         } catch (Exception e) {
           _logger.warn("Got exception while sending record {}", record);
@@ -270,7 +271,7 @@ abstract public class AbstractKafkaBasedConnectorTask implements Runnable, Consu
   }
 
   protected void sendDatastreamProducerRecord(DatastreamProducerRecord datastreamProducerRecord,
-      TopicPartition srcTopicPartition, int numBytes) {
+      TopicPartition srcTopicPartition, int numBytes, SendCallback sendCallback) {
     _producer.send(datastreamProducerRecord, ((metadata, exception) -> {
       if (exception != null) {
         _logger.warn("Detect exception being throw from callback for src partition: {} while sending producer "
@@ -278,6 +279,10 @@ abstract public class AbstractKafkaBasedConnectorTask implements Runnable, Consu
         rewindAndPausePartitionOnException(srcTopicPartition, exception);
       } else {
         _consumerMetrics.updateBytesProcessedRate(numBytes);
+      }
+
+      if (sendCallback != null) {
+        sendCallback.onCompletion(metadata, exception);
       }
     }));
   }
